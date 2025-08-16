@@ -1,65 +1,170 @@
 <?php
-// views/site/index.php
-$jsonData = json_encode($data, JSON_UNESCAPED_UNICODE);
+use yii\helpers\Html;
+
+/* @var $this yii\web\View */
+/* @var $deals array */
+/* @var $contacts array */
 ?>
 
-<style>
-    .topic { cursor:pointer; padding:5px; }
-    .sub { cursor:pointer; padding:5px; }
-    .selected { background: yellow; font-weight:bold; }
-</style>
+<div id="menu-table" style="width:100%; display:flex; gap:20px;">
 
-<table border="1" style="width:100%;">
-    <tr>
-        <th>Тема</th>
-        <th>Подтема</th>
-        <th>Текст</th>
-    </tr>
-    <tr>
-        <td id="topics"></td>
-        <td id="subtopics"></td>
-        <td id="content"></td>
-    </tr>
-</table>
+    <div style="flex:1">
+        <h3>Меню</h3>
+        <ul id="menu">
+            <li data-type="deals" class="selected">Сделки</li>
+            <li data-type="contacts">Контакты</li>
+        </ul>
+    </div>
+
+    <div style="flex:1">
+        <h3>Список</h3>
+        <ul id="list"></ul>
+    </div>
+
+    <div style="flex:2">
+        <h3>Содержимое</h3>
+        <div id="content"></div>
+    </div>
+
+</div>
+<h3>Действия:</h3>
+<button onclick="add()" id="addButton"></button>
+<button onclick="update()">Изменить</button>
+<button onclick="Delete()">Удалить</button>
 
 <script>
-const data = <?= $jsonData ?>;
+const deals = <?= json_encode($deals) ?>;
+const contacts = <?= json_encode($contacts) ?>;
 
-let currentTopic = 0;
-let currentSub = 0;
+let currentMenu = 'deals';
+let currentItem = null;
 
-const topicsEl = document.getElementById('topics');
-const subtopicsEl = document.getElementById('subtopics');
-const contentEl = document.getElementById('content');
+function renderMenu() {
+    document.querySelectorAll('#menu li').forEach(li=>{
+        li.classList.remove('selected');
+        if(li.dataset.type===currentMenu) li.classList.add('selected');
 
-function render() {
-    // Темы
-    topicsEl.innerHTML = data.map((t,i)=>`
-        <div class="topic ${i===currentTopic?'selected':''}" data-i="${i}">${t.name}</div>
-    `).join('');
+        addButton = document.getElementById('addButton')
+        addButton.textContent = currentMenu==='deals'?'Добавить сделку':'Добавить контакт'
+    });
+    renderList();
+}
+function add(){
 
-    // Подтемы
-    subtopicsEl.innerHTML = data[currentTopic].subtopics.map((s,i)=>`
-        <div class="sub ${i===currentSub?'selected':''}" data-i="${i}">${s.name}</div>
-    `).join('');
+    window.location.href = '/'+currentMenu+'/update'
+}
+function update(){
+    base = '/'+currentMenu+'/update'
+    id = currentItem;
+    console.log(base+'?id='+id)
+    window.location.href = base+'?id='+id;
 
-    // Контент
-    contentEl.textContent = data[currentTopic].subtopics[currentSub].text;
 }
 
-topicsEl.addEventListener('click', e => {
-    if(!e.target.dataset.i) return;
-    currentTopic = +e.target.dataset.i;
-    currentSub = 0; // выбрать первую подтему
-    render();
+function Delete(){
+    base = '/'+currentMenu+'/delete'
+    id = currentItem;
+    console.log(base+'?id='+id)
+    window.location.href = base+'?id='+id;
+}
+function renderList() {
+    const listEl = document.getElementById('list');
+    listEl.innerHTML = '';
+    let items = currentMenu==='deals'? deals : contacts;
+
+    items.forEach(item=>{
+        const li = document.createElement('li');
+        li.textContent = item.label;
+        li.dataset.id = item.id;
+        li.onclick = ()=>{
+            currentItem = item.id;
+            renderContent();
+            renderListSelection();
+        }
+        listEl.appendChild(li);
+    });
+
+    // Выбираем первый элемент по умолчанию
+    if(items.length>0 && !currentItem) {
+        currentItem = items[0].id;
+        renderContent();
+        renderListSelection();
+    }
+}
+
+function renderListSelection() {
+    document.querySelectorAll('#list li').forEach(li=>{
+        li.style.background = (li.dataset.id==currentItem)? 'yellow' : '';
+    });
+}
+function addRow(table,field, value) {
+    const row = table.insertRow();
+    row.insertCell().textContent = field;
+    row.insertCell().textContent = value;
+}
+function renderContent() {
+    const contentEl = document.getElementById('content');
+    let item = (currentMenu==='deals'? deals : contacts).find(x=>x.id==currentItem);
+    contentEl.innerHTML = '';
+
+    if(!item) return;
+
+    if(currentMenu==='deals') {
+        const table = document.createElement('table');
+        table.border = 1;
+        table.style.width = '100%';
+
+
+        addRow(table, 'id сделки', item.id);
+        addRow(table, 'Наименование', item.label);
+        addRow(table, 'Сумма', item.amount);
+        addRow(table, 'Контакты:','')
+        item.contacts.forEach((item)=>{
+            addRow(table, 'ID контакта: '+item.id , 'ФИО: '+item.label)
+
+        })
+
+        contentEl.appendChild(table);
+
+
+    } else {
+        console.log('Я тут')
+        const table = document.createElement('table');
+        table.border = 1;
+        table.style.width = '100%';
+
+
+        addRow(table, 'id контакта',item.id)
+        addRow(table, 'ФИО',item.label)
+        addRow(table, 'Сделки:','')
+        item.deals.forEach(item=>{
+            addRow(table, 'id сделки: '+item.id,'Название: '+item.label)
+        })
+
+        contentEl.appendChild(table);
+    }}
+
+document.querySelectorAll('#menu li').forEach(li=>{
+    li.onclick = ()=>{
+        currentMenu = li.dataset.type;
+        currentItem = null;
+        renderMenu();
+    }
 });
 
-subtopicsEl.addEventListener('click', e => {
-    if(!e.target.dataset.i) return;
-    currentSub = +e.target.dataset.i;
-    render();
-});
-
-
-render();
+renderMenu();
 </script>
+
+<style>
+#menu li, #list li {
+    cursor:pointer;
+    padding:5px;
+    list-style:none;
+}
+#menu li.selected {
+    background: yellow;
+}
+#list li:hover {
+    background:#eee;
+}
+</style>
